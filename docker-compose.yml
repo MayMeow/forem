@@ -19,7 +19,7 @@ services:
       - redis
       - yarn
     environment:
-      RAILS_ENV: development
+      RAILS_ENV: production
       DATABASE_URL: postgresql://forem:forem@db:5432/PracticalDeveloper_development
       REDIS_SESSIONS_URL: redis://redis:6379
       REDIS_SIDEKIQ_URL: redis://redis:6379
