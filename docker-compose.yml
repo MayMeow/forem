@@ -1,4 +1,11 @@
 version: "3"
+
+networks:
+  frontend:
+    external: true
+  forem_backend:
+    internal: true
+
 services:
   rails:
     image: quay.io/forem/forem:development
@@ -25,6 +32,19 @@ services:
       - .:/opt/apps/forem:delegated
     entrypoint: ["dockerize", "-wait", "tcp://db:5432", "-wait", "tcp://redis:6379", "-wait", "file:///opt/apps/forem/vendor/bundle/.bundle_finished", "-timeout", "2700s", "-wait-retry-interval", "10s"]
     command: [ "bash", "-c", "./scripts/entrypoint.sh bootstrap && bundle exec rails server -b 0.0.0.0 -p 3000"]
+    networks:
+      - forem_backend
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.forem.entrypoints=web,websecure"
+      - "traefik.http.routers.forem.rule=Host(`forem.cloud.themaymeow.com`)"
+      - "traefik.http.routers.forem.tls=true"
+      - "traefik.http.routers.forem.tls.certresolver=le"
+      - "traefik.http.routers.forem.tls.options=mytls@file"
+      - "traefik.http.routers.forem.service=forem"
+      - "traefik.http.services.forem.loadbalancer.server.port=3000"
+      - "traefik.docker.network=frontend"
 
   bundle:
     image: quay.io/forem/forem:development
@@ -39,6 +59,8 @@ services:
     volumes:
       - .:/opt/apps/forem:delegated
     command: ["./scripts/bundle.sh"]
+    networks: 
+      - forem_backend
 
   yarn:
     image: quay.io/forem/forem:development
@@ -53,6 +75,8 @@ services:
     volumes:
       - .:/opt/apps/forem:delegated
     command: yarn install --dev
+    networks: 
+      - forem_backend
 
   webpacker:
     image: quay.io/forem/forem:development
@@ -72,6 +96,8 @@ services:
       - .:/opt/apps/forem:delegated
     entrypoint: ["dockerize", "-wait", "file:///opt/apps/forem/node_modules/.bin/webpack-dev-server", "-wait", "file:///opt/apps/forem/vendor/bundle/.bundle_finished", "-timeout", "2700s", "-wait-retry-interval", "10s"]
     command: ["./bin/webpack-dev-server"]
+    networks: 
+      - forem_backend
 
   seed:
     image: quay.io/forem/forem:development
@@ -91,6 +117,8 @@ services:
       - .:/opt/apps/forem:delegated
     entrypoint: ["dockerize", "-wait", "tcp://db:5432", "-wait", "tcp://redis:6379", "-wait", "tcp://rails:3000", "-timeout", "2700s", "-wait-retry-interval", "20s"]
     command: ["bundle", "exec", "rake","db:seed"]
+    networks: 
+      - forem_backend
 
   sidekiq:
     image: quay.io/forem/forem:development
@@ -110,6 +138,9 @@ services:
       - .:/opt/apps/forem:delegated
     entrypoint: ["dockerize", "-wait", "tcp://db:5432", "-wait", "tcp://redis:6379", "-wait", "tcp://rails:3000", "-timeout", "2700s", "-wait-retry-interval", "20s"]
     command: ["bundle", "exec", "sidekiq","-c","2"]
+    networks: 
+      - forem_backend
+      - frontend
 
   db:
     image: postgres:11-alpine
@@ -122,12 +153,17 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data:delegated
+    networks: 
+      - forem_backend
 
   redis:
     image: redis:6.0.9-alpine
     container_name: forem_redis
     ports:
       - "6379:6379"
+    networks: 
+      - forem_backend
 
 volumes:
   db_data:
+  letsencrypt-data:
